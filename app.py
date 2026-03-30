@@ -168,9 +168,9 @@ try:
         state_btn.click(_gradio_state, outputs=[raw])
         grades_btn.click(_gradio_grades, outputs=[grades_out])
 
-    # Cap queue depth; default concurrency limit is 1 unless GRADIO_DEFAULT_CONCURRENCY_LIMIT is set.
-    demo.queue(max_size=64)
-    logger.info("Gradio Blocks ready (queue on); SPACE_ID=%s", _space_id)
+    # No demo.queue() on Hugging Face Spaces: the queue + WS path often triggers a bogus
+    # "runtime error" banner while container logs show a healthy startup (exit code 0).
+    logger.info("Gradio Blocks ready (queue off for HF); SPACE_ID=%s", _space_id)
 
 except Exception:
     _tb = traceback.format_exc()
