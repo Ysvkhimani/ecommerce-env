@@ -1,9 +1,11 @@
-FROM python:3.10
+FROM python:3.11
 
 WORKDIR /app
 
-COPY . .
+COPY . /app
 
-RUN pip install fastapi uvicorn
+RUN pip install --no-cache-dir fastapi uvicorn
+
+EXPOSE 7860
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
