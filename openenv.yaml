@@ -1,0 +1,36 @@
+version: 1
+
+name: ecommerce_env
+
+entrypoint: app:app
+
+tasks:
+  - name: easy
+    description: Complete purchase
+  - name: medium
+    description: Apply coupon and purchase
+  - name: hard
+    description: Follow full correct flow
+
+action_space:
+  type: object
+  properties:
+    action:
+      type: string
+      enum: ["add_item", "apply_coupon", "checkout", "pay"]
+
+observation_space:
+  type: object
+  properties:
+    cart:
+      type: array
+      items:
+        type: string
+    total:
+      type: number
+    coupon_applied:
+      type: boolean
+    payment_done:
+      type: boolean
+    order_status:
+      type: string
