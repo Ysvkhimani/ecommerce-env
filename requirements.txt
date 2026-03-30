@@ -1,2 +1,7 @@
-fastapi
-uvicorn
+# Exact pins = faster, deterministic Hugging Face Docker builds (avoids long pip resolution).
+# huggingface-hub: Gradio 4.x still imports HfFolder (removed in 0.25+).
+huggingface-hub==0.24.7
+fastapi==0.135.2
+uvicorn[standard]==0.42.0
+gradio==4.44.1
+pydantic==2.12.5

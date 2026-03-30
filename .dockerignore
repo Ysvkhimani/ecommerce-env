@@ -1,0 +1,13 @@
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.cursor
+*.md
+!README.md
+.env
+.venv
+venv
+# Nested template / duplicate package — not used by Space runtime; shrinks build context.
+ecommerce_env/
