@@ -192,3 +192,6 @@ except Exception:
     print(_tb, file=sys.stderr, flush=True)
     print(_tb, flush=True)
     demo = _error_demo(_tb)
+
+if __name__ == "__main__":
+    demo.launch()
