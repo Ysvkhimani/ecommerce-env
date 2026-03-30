@@ -149,9 +149,8 @@ try:
         gr.Markdown(
             f"# Ecommerce OpenEnv\n"
             f"**SPACE_ID:** `{_space_id}` · **COMMIT_SHA:** `{_commit}` · **PID:** `{_pid}`\n\n"
-            "If Hugging Face shows “runtime error” but this page loads, it is usually a **false alarm** "
-            "(check that buttons work). **Logs may list two startups** — that is normal when the host runs multiple workers.\n\n"
-            "Click **Reset**, choose an action, then **Step**."
+            "Select an action from the dropdown, then click **Step**. "
+            "Click **Reset** to start a fresh episode."
         )
         with gr.Row():
             reset_btn = gr.Button("Reset")
@@ -163,8 +162,7 @@ try:
             value="add_item",
             label="Action",
         )
-        # Explicit empty defaults avoid undefined frontend state on HF Spaces (can show as "runtime error").
-        obs_md = gr.Markdown(value="_Click **Reset** to start._", label="Observation")
+        obs_md = gr.Markdown(value="_Initialising..._", label="Observation")
         raw = gr.Code(value="{}", label="JSON", language="json")
         grades_out = gr.Code(
             value="{}",
@@ -173,15 +171,18 @@ try:
             visible=True,
         )
 
+        # Auto-reset on page load so Step works immediately without clicking Reset first.
+        demo.load(_gradio_reset, outputs=[obs_md, raw])
+
         reset_btn.click(_gradio_reset, outputs=[obs_md, raw])
         step_btn.click(_gradio_step, inputs=[action_in], outputs=[obs_md, raw])
         state_btn.click(_gradio_state, outputs=[raw])
         grades_btn.click(_gradio_grades, outputs=[grades_out])
 
-    # No demo.queue() on Hugging Face Spaces: the queue + WS path often triggers a bogus
-    # "runtime error" banner while container logs show a healthy startup (exit code 0).
+    # queue() is required in Gradio 5 for button-click events to be processed.
+    demo.queue()
     logger.info(
-        "Gradio Blocks ready (queue off for HF); SPACE_ID=%s pid=%s",
+        "Gradio Blocks ready; SPACE_ID=%s pid=%s",
         _space_id,
         _pid,
     )
