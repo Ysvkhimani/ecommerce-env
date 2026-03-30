@@ -1,12 +1,16 @@
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from env import reset, step, state as env_state
 import grader
 
 app = FastAPI(title="Ecommerce OpenEnv API")
-print("NEW VERSION DEPLOYED 🚀")
 
-# UI HOME PAGE
+print("🚀 NEW VERSION DEPLOYED")
+
+
+# =========================
+# ✅ HOME UI (MAIN PAGE)
+# =========================
 @app.get("/", response_class=HTMLResponse)
 def home():
     return """
@@ -34,35 +38,54 @@ def home():
     """
 
 
-
+# =========================
+# ✅ HF sometimes calls /web
+# =========================
 @app.get("/web", response_class=HTMLResponse)
 def web_ui():
     return home()
 
 
-# Health
+# =========================
+# ✅ HEALTH CHECK
+# =========================
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 
-# REST APIs (unchanged)
+# =========================
+# ✅ RESET ENV
+# =========================
 @app.get("/reset")
 def reset_env():
     return {"state": reset()}
 
 
+# =========================
+# ✅ TAKE ACTION
+# =========================
 @app.post("/step")
 def take_step(action: str):
     s, reward, done = step(action)
-    return {"state": s, "reward": reward, "done": done}
+    return {
+        "state": s,
+        "reward": reward,
+        "done": done
+    }
 
 
+# =========================
+# ✅ GET STATE
+# =========================
 @app.get("/state")
 def get_state():
     return {"state": env_state}
 
 
+# =========================
+# ✅ TASK INFO
+# =========================
 @app.get("/tasks")
 def tasks():
     return {
@@ -71,6 +94,9 @@ def tasks():
     }
 
 
+# =========================
+# ✅ GRADER
+# =========================
 @app.get("/grader")
 def get_grades():
     return {
@@ -80,6 +106,9 @@ def get_grades():
     }
 
 
+# =========================
+# ✅ BASELINE AGENT
+# =========================
 @app.get("/baseline")
 def run_baseline():
     reset()
@@ -96,7 +125,28 @@ def run_baseline():
     }
 
 
-# run
+# =========================
+# 🚨 IMPORTANT FIX (HF ROUTING)
+# =========================
+@app.api_route("/{path:path}", methods=["GET", "POST"])
+def catch_all(path: str):
+    return JSONResponse({
+        "message": "Ecommerce OpenEnv running",
+        "hint": "Use /docs for API",
+        "available_endpoints": [
+            "/reset",
+            "/step",
+            "/state",
+            "/tasks",
+            "/grader",
+            "/baseline"
+        ]
+    })
+
+
+# =========================
+# ✅ LOCAL / DOCKER RUN
+# =========================
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=7860)
