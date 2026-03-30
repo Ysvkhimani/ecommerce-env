@@ -4,7 +4,19 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from typing import Any
+
+# Hugging Face captures stdout/stderr for "Container" logs — log there explicitly.
+print("ecommerce-env: loading app.py", file=sys.stderr, flush=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+logger = logging.getLogger(__name__)
 
 import gradio as gr
 from pydantic import ValidationError
@@ -14,8 +26,7 @@ from env import InvalidActionError
 from grader import grade_easy, grade_hard, grade_medium
 from models import EcommerceAction, EcommerceObservation
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger.info("ecommerce-env: imports OK, building UI")
 
 _env = EcommerceEnvironment()
 
@@ -126,3 +137,7 @@ with gr.Blocks(title="Ecommerce OpenEnv") as demo:
     step_btn.click(_gradio_step, inputs=[action_in], outputs=[obs_md, raw])
     state_btn.click(_gradio_state, outputs=[raw])
     grades_btn.click(_gradio_grades, outputs=[grades_out])
+
+# Recommended on Hugging Face Spaces (concurrency + clearer worker logs).
+demo.queue()
+logger.info("ecommerce-env: Gradio Blocks ready (demo.queue enabled)")
