@@ -4,7 +4,7 @@ emoji: 🛒
 colorFrom: blue
 colorTo: green
 sdk: gradio
-sdk_version: 4.44.1
+sdk_version: 5.50.0
 python_version: "3.11"
 startup_duration_timeout: 30m
 ---
@@ -17,4 +17,6 @@ Use **Reset** → pick an action → **Step**. **Run grader** scores the current
 
 **Logs:** open **Logs → Container** (not only Build). Build logs show `pip install`; runtime lines start with `ecommerce-env: app.py`.
 
-**Blank Space / no logs:** if `huggingface_hub` upgraded to 1.x, Gradio 4 fails on import (`HfFolder`). This repo pins `huggingface-hub==0.24.7` and `gradio-client==1.3.0` in `requirements.txt` — do not remove those pins.
+**Gradio / hub versions:** `sdk_version` in this file must match the `gradio==…` line in `requirements.txt` (Hugging Face installs `gradio[oauth]` from that version). This repo uses **Gradio 5.50** with `huggingface-hub==0.34.6` so the Space image stays compatible with the preinstalled `datasets` package (`huggingface-hub>=0.25`).
+
+**HTTP 500:** after changing versions, push to `main` and wait for a full rebuild; then hard-refresh the Space. Check **Logs → Container** for Python tracebacks.

@@ -150,18 +150,26 @@ try:
             grades_btn = gr.Button("Run grader")
         action_in = gr.Dropdown(
             choices=["add_item", "apply_coupon", "checkout", "pay"],
+            value="add_item",
             label="Action",
         )
-        obs_md = gr.Markdown(label="Observation")
-        raw = gr.Code(label="JSON", language="json")
-        grades_out = gr.Code(label="Grader (easy / medium / hard)", language="json", visible=True)
+        # Explicit empty defaults avoid undefined frontend state on HF Spaces (can show as "runtime error").
+        obs_md = gr.Markdown(value="_Click **Reset** to start._", label="Observation")
+        raw = gr.Code(value="{}", label="JSON", language="json")
+        grades_out = gr.Code(
+            value="{}",
+            label="Grader (easy / medium / hard)",
+            language="json",
+            visible=True,
+        )
 
         reset_btn.click(_gradio_reset, outputs=[obs_md, raw])
         step_btn.click(_gradio_step, inputs=[action_in], outputs=[obs_md, raw])
         state_btn.click(_gradio_state, outputs=[raw])
         grades_btn.click(_gradio_grades, outputs=[grades_out])
 
-    demo.queue()
+    # Cap queue depth; default concurrency limit is 1 unless GRADIO_DEFAULT_CONCURRENCY_LIMIT is set.
+    demo.queue(max_size=64)
     logger.info("Gradio Blocks ready (queue on); SPACE_ID=%s", _space_id)
 
 except Exception:

@@ -6,8 +6,8 @@ authors = [
     {name = "Yashvi"}
 ]
 dependencies = [
-    "huggingface-hub==0.24.7",
-    "gradio-client==1.3.0",
-    "gradio==4.44.1",
-    "pydantic==2.12.5",
+    "huggingface-hub==0.34.6",
+    "gradio-client==1.14.0",
+    "gradio==5.50.0",
+    "pydantic==2.12.3",
 ]

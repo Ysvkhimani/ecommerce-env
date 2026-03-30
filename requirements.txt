@@ -1,6 +1,6 @@
-# Order matters: pin huggingface-hub BEFORE gradio. Gradio 4.x oauth needs HfFolder (removed in hub 0.25+).
-# If pip upgrades huggingface_hub to 1.x, `import gradio` fails with ImportError: HfFolder — empty Space / no logs.
-huggingface-hub==0.24.7
-gradio-client==1.3.0
-gradio==4.44.1
-pydantic==2.12.5
+# Pin huggingface-hub BEFORE gradio. Must be >=0.33.5 for Gradio 5.50 and >=0.25 for HF base `datasets`.
+# Gradio 4.x + hub 0.24.x is no longer needed; Gradio 5 works with current hub (no HfFolder issue).
+huggingface-hub==0.34.6
+gradio-client==1.14.0
+gradio==5.50.0
+pydantic==2.12.3
