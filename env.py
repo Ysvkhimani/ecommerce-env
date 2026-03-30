@@ -1,9 +1,24 @@
-"""E-commerce cart simulation (shared by HTTP env, client, and grader)."""
+"""E-commerce cart simulation (shared by environment, client, and grader)."""
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
+
+ALLOWED_ACTIONS = frozenset({"add_item", "apply_coupon", "checkout", "pay"})
+
+
+class InvalidActionError(ValueError):
+    """Raised when ``action`` is not one of the allowed simulator commands."""
+
+    def __init__(self, action: str) -> None:
+        self.action = action
+        super().__init__(
+            f"Invalid action {action!r}. Allowed: {sorted(ALLOWED_ACTIONS)}"
+        )
 
 
 class EcommerceSimulator:
@@ -30,6 +45,10 @@ class EcommerceSimulator:
         return dict(self.state)
 
     def step(self, action: str) -> Tuple[Dict[str, Any], float, bool]:
+        if action not in ALLOWED_ACTIONS:
+            logger.warning("Rejected invalid action: %r", action)
+            raise InvalidActionError(action)
+
         reward = 0.0
         done = False
 
@@ -62,7 +81,7 @@ class EcommerceSimulator:
         return dict(self.state), reward, done
 
 
-# Single process-wide simulator: shared by OpenEnv `EcommerceEnvironment`, grader, and scripts.
+# Single process-wide simulator: shared by EcommerceEnvironment, grader, and scripts.
 _sim = EcommerceSimulator()
 
 

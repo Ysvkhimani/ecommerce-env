@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
-from env import get_simulator
+from env import InvalidActionError, get_simulator
 from models import EcommerceAction, EcommerceEnvState, EcommerceObservation
+
+logger = logging.getLogger(__name__)
 
 
 class EcommerceEnvironment:
-    """Cart RL-style env: reset / step / state (Gradio + REST use the same instance)."""
+    """Cart RL-style env: reset / step / state (Gradio + scripts use the same instance)."""
 
     def __init__(self) -> None:
         self._sim = get_simulator()
@@ -35,7 +38,11 @@ class EcommerceEnvironment:
         episode_id: Optional[str] = None,
         **kwargs: object,
     ) -> EcommerceObservation:
-        self._sim.reset()
+        try:
+            self._sim.reset()
+        except Exception as e:
+            logger.exception("reset failed")
+            raise RuntimeError("Failed to reset environment") from e
         self._state = self._state_from_sim()
         return self._observation(reward=0.0, done=False)
 
@@ -45,7 +52,13 @@ class EcommerceEnvironment:
         timeout_s: Optional[float] = None,
         **kwargs: object,
     ) -> EcommerceObservation:
-        _s, reward, done = self._sim.step(action.action)
+        try:
+            _s, reward, done = self._sim.step(action.action)
+        except InvalidActionError:
+            raise
+        except Exception as e:
+            logger.exception("step failed for action=%s", getattr(action, "action", action))
+            raise RuntimeError("Environment step failed") from e
         self._state = self._state_from_sim()
         return self._observation(reward=reward, done=done)
 
@@ -57,11 +70,11 @@ class EcommerceEnvironment:
     def _observation(self, reward: float, done: bool) -> EcommerceObservation:
         s = self._sim.state
         return EcommerceObservation(
-            cart=list(s["cart"]),
-            total=float(s["total"]),
-            coupon_applied=bool(s["coupon_applied"]),
-            payment_done=bool(s["payment_done"]),
-            order_status=str(s["order_status"]),
+            cart=list(s.get("cart", [])),
+            total=float(s.get("total", 0)),
+            coupon_applied=bool(s.get("coupon_applied", False)),
+            payment_done=bool(s.get("payment_done", False)),
+            order_status=str(s.get("order_status", "incomplete")),
             reward=reward,
             done=done,
         )
