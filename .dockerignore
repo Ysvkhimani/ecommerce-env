@@ -11,3 +11,4 @@
 venv
 # Nested template / duplicate package — not used by Space runtime; shrinks build context.
 ecommerce_env/
+

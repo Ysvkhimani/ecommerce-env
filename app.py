@@ -19,6 +19,9 @@ except ImportError as e:
     print(f"ecommerce-env: FATAL gradio import failed: {e}", file=sys.stderr, flush=True)
     raise
 
+# Hugging Face / reverse-proxy friendly defaults (Gradio reads these at init).
+os.environ.setdefault("GRADIO_SERVER_NAME", "0.0.0.0")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -32,7 +35,11 @@ logger = logging.getLogger("ecommerce-env")
 
 def _error_demo(tb: str) -> gr.Blocks:
     """If the real app fails to load, Hugging Face still gets a valid `demo` and you see the error in the browser."""
-    with gr.Blocks(title="Ecommerce OpenEnv — startup error", analytics_enabled=False) as err_demo:
+    with gr.Blocks(
+        title="Ecommerce OpenEnv — startup error",
+        analytics_enabled=False,
+        theme=gr.themes.Default(),
+    ) as err_demo:
         gr.Markdown(
             "# App failed during import\n"
             "Hugging Face sometimes hides container logs; **this page is the error report**. "
@@ -136,11 +143,14 @@ try:
 
     _space_id = os.environ.get("SPACE_ID", "(not set — running locally?)")
     _commit = os.environ.get("COMMIT_SHA", "(unknown)")
+    _pid = os.getpid()
 
     with gr.Blocks(title="Ecommerce OpenEnv", analytics_enabled=False) as demo:
         gr.Markdown(
             f"# Ecommerce OpenEnv\n"
-            f"**SPACE_ID:** `{_space_id}` · **COMMIT_SHA:** `{_commit}`\n\n"
+            f"**SPACE_ID:** `{_space_id}` · **COMMIT_SHA:** `{_commit}` · **PID:** `{_pid}`\n\n"
+            "If Hugging Face shows “runtime error” but this page loads, it is usually a **false alarm** "
+            "(check that buttons work). **Logs may list two startups** — that is normal when the host runs multiple workers.\n\n"
             "Click **Reset**, choose an action, then **Step**."
         )
         with gr.Row():
@@ -170,7 +180,11 @@ try:
 
     # No demo.queue() on Hugging Face Spaces: the queue + WS path often triggers a bogus
     # "runtime error" banner while container logs show a healthy startup (exit code 0).
-    logger.info("Gradio Blocks ready (queue off for HF); SPACE_ID=%s", _space_id)
+    logger.info(
+        "Gradio Blocks ready (queue off for HF); SPACE_ID=%s pid=%s",
+        _space_id,
+        _pid,
+    )
 
 except Exception:
     _tb = traceback.format_exc()
