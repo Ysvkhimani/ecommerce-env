@@ -4,7 +4,7 @@ from env import reset, step, state as env_state
 import grader
 
 app = FastAPI(title="Ecommerce OpenEnv API")
-
+print("NEW VERSION DEPLOYED 🚀")
 
 # UI HOME PAGE
 @app.get("/", response_class=HTMLResponse)
