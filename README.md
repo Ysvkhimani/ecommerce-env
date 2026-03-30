@@ -15,4 +15,6 @@ This Space uses the **Gradio** SDK (no Docker), so it usually builds in **a few 
 
 Use **Reset** → pick an action → **Step**. **Run grader** scores the current cart state (easy / medium / hard).
 
-**Logs:** open **Logs → Container** (not only Build) to see app startup lines such as `ecommerce-env: loading app.py`. Build logs mostly show `pip install`; runtime messages go to Container.
+**Logs:** open **Logs → Container** (not only Build). Build logs show `pip install`; runtime lines start with `ecommerce-env: app.py`.
+
+**Blank Space / no logs:** if `huggingface_hub` upgraded to 1.x, Gradio 4 fails on import (`HfFolder`). This repo pins `huggingface-hub==0.24.7` and `gradio-client==1.3.0` in `requirements.txt` — do not remove those pins.

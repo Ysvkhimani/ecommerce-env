@@ -1,4 +1,6 @@
-# Gradio Space (sdk: gradio) — Hugging Face installs this without building Docker.
+# Order matters: pin huggingface-hub BEFORE gradio. Gradio 4.x oauth needs HfFolder (removed in hub 0.25+).
+# If pip upgrades huggingface_hub to 1.x, `import gradio` fails with ImportError: HfFolder — empty Space / no logs.
 huggingface-hub==0.24.7
+gradio-client==1.3.0
 gradio==4.44.1
 pydantic==2.12.5
