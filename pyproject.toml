@@ -6,8 +6,6 @@ authors = [
     {name = "Yashvi"}
 ]
 dependencies = [
-    "fastapi==0.135.2",
-    "uvicorn[standard]==0.42.0",
     "huggingface-hub==0.24.7",
     "gradio==4.44.1",
     "pydantic==2.12.5",
