@@ -1,8 +1,4 @@
-"""Pydantic models for the HTTP API and environment.
-
-EcommerceAction and EcommerceObservation extend the openenv.core base types so
-the server passes openenv validate and create_app() works correctly.
-"""
+"""Pydantic models for the Customer Support Agent environment."""
 
 from __future__ import annotations
 
@@ -13,40 +9,69 @@ from pydantic import Field
 from openenv.core.env_server.types import Action, Observation, State
 
 
-class EcommerceAction(Action):
-    """Cart action — one of four discrete steps in the purchase flow."""
+class SupportAction(Action):
+    """One of eight discrete actions the support agent can take."""
 
-    action: Literal["add_item", "apply_coupon", "checkout", "pay"] = Field(
-        ...,
-        description="Cart action to execute",
-    )
-    # `metadata` is inherited from Action
-
-
-class EcommerceObservation(Observation):
-    """Observation returned after each step."""
-
-    cart: List[str] = Field(default_factory=list, description="Items in the cart")
-    total: float = Field(default=0.0, description="Cart total (after any coupon)")
-    coupon_applied: bool = Field(default=False, description="Whether a coupon is applied")
-    payment_done: bool = Field(default=False, description="Whether payment is complete")
-    order_status: str = Field(default="incomplete", description="Order status")
-    # `done`, `reward`, `metadata` are inherited from Observation
+    action: Literal[
+        "acknowledge",
+        "investigate",
+        "offer_refund",
+        "offer_exchange",
+        "apply_discount",
+        "escalate",
+        "request_info",
+        "resolve",
+    ] = Field(..., description="Support action to execute")
+    # `metadata` inherited from Action
 
 
-class EcommerceEnvState(State):
-    """Full internal state, richer than the public observation."""
+class SupportObservation(Observation):
+    """Observation returned after each support action."""
 
-    cart: List[str] = Field(default_factory=list)
-    total: float = 0.0
-    coupon_applied: bool = False
-    payment_done: bool = False
-    order_status: str = "incomplete"
+    # Ticket context (static throughout episode)
+    ticket_type: str = Field(default="damaged_item", description="Type of customer issue")
+    ticket_subject: str = Field(default="", description="Ticket subject line")
+    ticket_description: str = Field(default="", description="Full customer message")
+    customer_name: str = Field(default="", description="Customer's name")
+    customer_tier: str = Field(default="regular", description="Customer tier: vip/regular/new")
+    order_value: float = Field(default=0.0, description="Value of the affected order ($)")
+
+    # Mutable episode state
+    sentiment: float = Field(default=0.3, description="Customer sentiment 0.0 (angry) → 1.0 (happy)")
+    investigated: bool = Field(default=False, description="Whether order was looked up")
+    refund_offered: bool = Field(default=False, description="Whether a full refund was offered")
+    exchange_offered: bool = Field(default=False, description="Whether a replacement was offered")
+    discount_applied: bool = Field(default=False, description="Whether a goodwill discount was given")
+    escalated: bool = Field(default=False, description="Whether ticket was escalated")
+    resolved: bool = Field(default=False, description="Whether ticket is closed")
+    satisfaction_score: float = Field(default=0.0, description="Final satisfaction score (0.0–1.0)")
+    # `done`, `reward`, `metadata` inherited from Observation
+
+
+class SupportEnvState(State):
+    """Full internal state, richer than the observation (includes history)."""
+
+    ticket_type: str = "damaged_item"
+    ticket_subject: str = ""
+    ticket_description: str = ""
+    customer_name: str = ""
+    customer_tier: str = "regular"
+    order_value: float = 0.0
+    sentiment: float = 0.3
+    investigated: bool = False
+    refund_offered: bool = False
+    exchange_offered: bool = False
+    discount_applied: bool = False
+    escalated: bool = False
+    resolved: bool = False
+    satisfaction_score: float = 0.0
     history: List[str] = Field(default_factory=list)
-    # `episode_id`, `step_count` are inherited from State
+    # `episode_id`, `step_count` inherited from State
 
 
-class StepRequest(Action):
-    """Generic step request wrapper (kept for backward compatibility)."""
-
-    action: dict = Field(default_factory=dict)
+# ---------------------------------------------------------------------------
+# Backward-compatibility aliases (used by server/app.py create_app call)
+# ---------------------------------------------------------------------------
+EcommerceAction = SupportAction
+EcommerceObservation = SupportObservation
+EcommerceEnvState = SupportEnvState

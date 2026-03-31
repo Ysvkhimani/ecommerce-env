@@ -1,8 +1,8 @@
 ---
 title: Ecommerce Env
-emoji: 🛒
+emoji: 🎧
 colorFrom: blue
-colorTo: green
+colorTo: indigo
 sdk: docker
 python_version: "3.11"
 startup_duration_timeout: 30m
@@ -10,44 +10,74 @@ tags:
   - openenv
 ---
 
-# Ecommerce OpenEnv
+# E-commerce Customer Support Agent Environment
 
-An **OpenEnv**-compliant e-commerce cart simulation where an AI agent learns to complete a shopping workflow through the standard `reset()` / `step()` / `state()` API.
+An **OpenEnv**-compliant environment where an AI agent acts as a **customer service representative** for an e-commerce store. The agent receives a real customer support ticket and must resolve it by choosing the right sequence of actions — balancing empathy, investigation, and resolution quality.
 
-## Environment Description
+> **Why this matters:** AI-powered customer support is one of the fastest-growing applications of LLM agents. This environment lets you train and evaluate agents on a realistic, consequential task that humans do every day.
 
-The agent operates a shopping cart with four discrete actions. It receives partial reward at each step and a terminal reward on successful checkout. Three graded tasks (easy → medium → hard) measure progressively stricter completion criteria.
+---
 
-## Action Space
+## The Scenario
+
+A customer purchased a laptop (Order #ORD-98765, $999). It arrived with a **cracked screen**. They've submitted a ticket demanding resolution.
+
+The agent starts with a frustrated customer (sentiment = 0.3 / 10) and must bring them to satisfaction through careful, empathetic action.
+
+---
+
+## Action Space (8 discrete actions)
 
 | Action | Effect | Reward |
 |---|---|---|
-| `add_item` | Add a $100 item to cart | +0.2 |
-| `apply_coupon` | Apply 10% discount (once per episode) | +0.3 (−0.1 if already used) |
-| `checkout` | Proceed to checkout | +0.3 (−0.5 if cart empty) |
-| `pay` | Complete payment | +1.0 (−1.0 if cart empty) |
+| `acknowledge` | Acknowledge the issue — builds immediate trust | +0.1 |
+| `investigate` | Look up order details — **unlocks better resolution options** | +0.1 |
+| `offer_refund` | Full refund — best outcome if investigated first | +0.5 (investigated) / +0.2 |
+| `offer_exchange` | Send replacement — good alternative to refund | +0.4 (investigated) / +0.1 |
+| `apply_discount` | Goodwill 10% off next order | +0.1 |
+| `escalate` | Transfer to senior agent — frustrates customer | −0.3 |
+| `request_info` | Ask for info already in the ticket — annoys customer | −0.1 |
+| `resolve` | Close ticket — reward = final customer sentiment (0.0–1.0) | 0.0–1.0 |
+
+**Optimal policy:** `acknowledge → investigate → offer_refund → resolve`
+→ Final sentiment: **0.90** | Steps: **4** | Score: **1.0 / 1.0 / 1.0**
+
+---
 
 ## Observation Space
 
 ```json
 {
-  "cart": ["item"],
-  "total": 90.0,
-  "coupon_applied": true,
-  "payment_done": false,
-  "order_status": "incomplete",
-  "reward": 0.3,
+  "ticket_type": "damaged_item",
+  "ticket_subject": "My laptop arrived with a cracked screen",
+  "ticket_description": "...",
+  "customer_name": "Alex",
+  "customer_tier": "regular",
+  "order_value": 999.0,
+  "sentiment": 0.75,
+  "investigated": true,
+  "refund_offered": false,
+  "exchange_offered": false,
+  "discount_applied": false,
+  "escalated": false,
+  "resolved": false,
+  "satisfaction_score": 0.0,
+  "reward": 0.1,
   "done": false
 }
 ```
 
-## Tasks
+---
 
-| ID | Description | Difficulty | Max Score |
-|---|---|---|---|
-| `easy` | Add item and pay | Easy | 1.0 |
-| `medium` | Apply coupon then pay | Medium | 1.0 |
-| `hard` | Exact sequence: add_item → apply_coupon → checkout → pay | Hard | 1.0 |
+## Tasks (Easy → Hard)
+
+| ID | Description | Scoring |
+|---|---|---|
+| `easy` | Resolve the ticket — any resolution counts | 1.0 if resolved |
+| `medium` | Resolve with meaningful customer satisfaction | satisfaction_score if resolved |
+| `hard` | Resolve efficiently: satisfaction ≥ 0.8, ≤ 5 steps, no escalation | 1.0 / 0.7 / 0.5 / 0.2 |
+
+---
 
 ## HTTP API
 
@@ -55,34 +85,35 @@ The agent operates a shopping cart with four discrete actions. It receives parti
 |---|---|---|
 | `GET` | `/` | Health check |
 | `GET` | `/tasks` | Task list + action schema |
-| `POST` | `/reset` | Reset episode |
-| `POST` | `/step` | Execute `{"action": "add_item"}` |
-| `GET` | `/state` | Full environment state |
-| `GET` | `/grader` | Grader scores (easy / medium / hard) |
+| `POST` | `/reset` | Start new episode |
+| `POST` | `/step` | Execute `{"action": {"action": "acknowledge"}}` |
+| `GET` | `/state` | Current episode state |
+| `GET` | `/grader` | Live grader scores (easy / medium / hard) |
 | `POST` | `/baseline` | Run optimal policy, return scores |
-| `GET` | `/web` | Interactive Gradio UI |
-| `GET` | `/docs` | Auto-generated OpenAPI docs |
+| `GET` | `/docs` | Interactive API docs (Swagger) |
 
-## Setup Instructions
+---
 
-### Docker (recommended)
+## Setup
 
+### Docker
 ```bash
-docker build -t ecommerce-env .
-docker run -p 7860:7860 ecommerce-env
-# API: http://localhost:7860
-# UI:  http://localhost:7860/web
+docker build -t ecommerce-support-env .
+docker run -p 7860:7860 ecommerce-support-env
 ```
 
-### Python (local)
-
+### Python
 ```bash
 pip install -r requirements.txt
-uvicorn server.app:app --host 0.0.0.0 --port 7860
+uvicorn server.app:app --port 7860
 ```
 
-## Baseline Inference
+### Baseline (no LLM)
+```bash
+python baseline.py
+```
 
+### Inference (LLM agent)
 ```bash
 export API_BASE_URL="https://router.huggingface.co/v1"
 export MODEL_NAME="Qwen/Qwen2.5-72B-Instruct"
@@ -90,29 +121,19 @@ export HF_TOKEN="hf_..."
 python inference.py
 ```
 
-Expected baseline scores (optimal policy):
+**Expected baseline scores:**
 ```json
-{
-  "easy":   1.0,
-  "medium": 1.0,
-  "hard":   1.0
-}
+{ "easy": 1.0, "medium": 0.9, "hard": 1.0 }
 ```
 
-## Example API Calls
+---
 
-```bash
-# Reset
-curl -X POST http://localhost:7860/reset
+## Reward Design
 
-# Step
-curl -X POST http://localhost:7860/step \
-  -H "Content-Type: application/json" \
-  -d '{"action": "add_item"}'
+Rewards are shaped across the full trajectory — not just at episode end:
+- **Partial rewards** for each beneficial action (acknowledge, investigate)
+- **Multiplicative bonus** for combining investigate + offer_refund (more confident resolution)
+- **Penalties** for bad practices (escalating unnecessarily, asking for info already given, repeating actions)
+- **Terminal reward** = final customer sentiment (continuous signal, 0.0–1.0)
 
-# Grader scores
-curl http://localhost:7860/grader
-
-# Run full baseline
-curl -X POST http://localhost:7860/baseline
-```
+This makes the reward signal dense and informative for RL training.

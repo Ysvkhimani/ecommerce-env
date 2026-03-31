@@ -1,23 +1,21 @@
 """
-OpenEnv-compliant FastAPI server for the Ecommerce environment.
+OpenEnv-compliant FastAPI server — E-commerce Customer Support Agent Environment.
 
-Standard endpoints (provided by openenv.core.create_app):
-    POST /reset     — reset episode
+Standard endpoints (openenv.core.create_app):
+    POST /reset     — start new episode
     POST /step      — execute action
     GET  /state     — current state
     GET  /schema    — action/observation schema
     WS   /ws        — WebSocket session
 
-Additional endpoints required by hackathon judges:
+Additional hackathon endpoints:
+    GET  /          — health check
     GET  /tasks     — task list + action schema
     GET  /grader    — grader scores (easy / medium / hard)
     POST /baseline  — run optimal policy, return episode + scores
 
-Gradio web UI is served at /web by openenv.core (built-in).
-
 Run locally:
     uvicorn server.app:app --host 0.0.0.0 --port 7860
-    # then open http://localhost:7860/web
 """
 
 from __future__ import annotations
@@ -26,7 +24,6 @@ import os
 import sys
 from typing import Any
 
-# Make project root importable when running via `uvicorn server.app:app`
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _root not in sys.path:
     sys.path.insert(0, _root)
@@ -34,86 +31,89 @@ if _root not in sys.path:
 from openenv.core.env_server.http_server import create_app
 
 try:
-    from .ecommerce_environment import EcommerceEnv
-    from ..models import EcommerceAction, EcommerceObservation
+    from .ecommerce_environment import CustomerSupportEnv
+    from ..models import SupportAction, SupportObservation
     from ..grader import grade_easy, grade_hard, grade_medium
+    from ..env import OPTIMAL_POLICY
 except ImportError:
-    from server.ecommerce_environment import EcommerceEnv
-    from models import EcommerceAction, EcommerceObservation
+    from server.ecommerce_environment import CustomerSupportEnv
+    from models import SupportAction, SupportObservation
     from grader import grade_easy, grade_hard, grade_medium
+    from env import OPTIMAL_POLICY
 
 # ---------------------------------------------------------------------------
-# Create the base OpenEnv app (provides /reset /step /state /schema /ws /web)
+# OpenEnv base app
 # ---------------------------------------------------------------------------
 app = create_app(
-    EcommerceEnv,
-    EcommerceAction,
-    EcommerceObservation,
-    env_name="ecommerce-env",
+    CustomerSupportEnv,
+    SupportAction,
+    SupportObservation,
+    env_name="ecommerce-support-env",
     max_concurrent_envs=1,
 )
 
 # ---------------------------------------------------------------------------
-# Root health check (judges ping the Space URL and expect 200)
-# ---------------------------------------------------------------------------
-
-
-@app.get("/")
-async def health() -> dict[str, str]:
-    return {"status": "ok", "env": "ecommerce-env", "ui": "/web", "docs": "/docs"}
-
-
-# ---------------------------------------------------------------------------
-# Task definitions (static metadata)
+# Task definitions
 # ---------------------------------------------------------------------------
 TASKS = [
     {
         "id": "easy",
-        "description": "Complete a purchase: add at least one item and pay",
+        "description": "Resolve the customer support ticket — any resolution counts",
         "difficulty": "easy",
-        "scoring": "1.0 if payment_done, else 0.0",
+        "scoring": "1.0 if resolved, else 0.0",
     },
     {
         "id": "medium",
-        "description": "Complete a purchase with a coupon applied before paying",
+        "description": "Resolve the ticket with meaningful customer satisfaction",
         "difficulty": "medium",
-        "scoring": "1.0 if paid+coupon, 0.5 if paid without coupon, else 0.0",
+        "scoring": "satisfaction_score (0.0–1.0) if resolved, partial credit for low satisfaction",
     },
     {
         "id": "hard",
-        "description": "Complete purchase in exact order: add_item → apply_coupon → checkout → pay",
+        "description": (
+            "Resolve efficiently: satisfaction ≥ 0.8, ≤ 5 steps, no escalation. "
+            "Optimal: acknowledge → investigate → offer_refund → resolve"
+        ),
         "difficulty": "hard",
-        "scoring": "1.0 if exact sequence, 0.5 if paid (wrong order), else 0.0",
+        "scoring": "1.0 (efficient+satisfied), 0.7 (satisfied, no escalation), 0.5 (resolved, clean), 0.2 (escalated)",
     },
 ]
 
 ACTION_SCHEMA = {
     "action": {
         "type": "string",
-        "enum": ["add_item", "apply_coupon", "checkout", "pay"],
-        "description": "Cart action to execute",
+        "enum": [
+            "acknowledge",
+            "investigate",
+            "offer_refund",
+            "offer_exchange",
+            "apply_discount",
+            "escalate",
+            "request_info",
+            "resolve",
+        ],
+        "description": "Support action to execute",
     },
-    "metadata": {
-        "type": "object",
-        "description": "Optional extra metadata",
-        "default": {},
-    },
+    "metadata": {"type": "object", "description": "Optional metadata", "default": {}},
 }
 
 # ---------------------------------------------------------------------------
-# Additional judge-required endpoints
+# Hackathon-required endpoints
 # ---------------------------------------------------------------------------
+
+
+@app.get("/")
+async def health() -> dict[str, str]:
+    return {"status": "ok", "env": "ecommerce-customer-support", "docs": "/docs"}
 
 
 @app.get("/tasks")
 async def get_tasks() -> dict[str, Any]:
-    """Return the task list and action schema."""
     return {"tasks": TASKS, "action_schema": ACTION_SCHEMA}
 
 
 @app.get("/grader")
 async def get_grader() -> dict[str, float]:
-    """Return grader scores for the current episode state."""
     return {
         "easy": grade_easy(),
         "medium": grade_medium(),
@@ -123,18 +123,17 @@ async def get_grader() -> dict[str, float]:
 
 @app.post("/baseline")
 async def run_baseline() -> dict[str, Any]:
-    """Run the optimal policy and return per-task scores."""
-    env = EcommerceEnv()
+    """Run the optimal policy and return episode + per-task scores."""
+    env = CustomerSupportEnv()
     env.reset()
-    policy = ["add_item", "apply_coupon", "checkout", "pay"]
     episode: list[dict[str, Any]] = []
-    for action in policy:
-        act = EcommerceAction(action=action)
+    for action in OPTIMAL_POLICY:
+        act = SupportAction(action=action)
         obs = env.step(act)
-        episode.append({"action": action, "reward": obs.reward, "done": obs.done})
+        episode.append({"action": action, "sentiment": obs.sentiment, "reward": obs.reward, "done": obs.done})
 
     return {
-        "policy": "optimal (add_item → apply_coupon → checkout → pay)",
+        "policy": " → ".join(OPTIMAL_POLICY),
         "episode": episode,
         "scores": {
             "easy": grade_easy(),
@@ -145,19 +144,17 @@ async def run_baseline() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Entry point for `uv run server` or direct execution
+# Entry point
 # ---------------------------------------------------------------------------
 
 
 def main(host: str = "0.0.0.0", port: int = 7860) -> None:
     import uvicorn
-
     uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
     import argparse
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=7860)

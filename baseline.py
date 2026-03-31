@@ -1,40 +1,27 @@
-"""Baseline inference script.
+"""Baseline script — runs the optimal policy and prints grader scores.
 
-Runs the optimal policy (add_item → apply_coupon → checkout → pay) and
-reports grader scores for all three tasks (easy / medium / hard).
+Optimal policy: acknowledge → investigate → offer_refund → resolve
+Expected scores: easy=1.0, medium≈0.90, hard=1.0
 
 Usage:
     python baseline.py
-
-Expected output:
-    easy:   1.0
-    medium: 1.0
-    hard:   1.0
 """
 
 from __future__ import annotations
 
 import json
-
-from env import reset, step
+from env import OPTIMAL_POLICY, reset, step
 from grader import grade_easy, grade_hard, grade_medium
 
 
 def run_baseline() -> dict[str, float]:
-    """Execute optimal policy and return grader scores."""
     reset()
-    policy = ["add_item", "apply_coupon", "checkout", "pay"]
-
-    print("Running baseline policy:")
-    for action in policy:
+    print("Running optimal policy:")
+    for action in OPTIMAL_POLICY:
         state, reward, done = step(action)
-        print(f"  action={action!r:15s}  reward={reward:+.2f}  done={done}")
+        print(f"  {action:20s}  sentiment={state['sentiment']:.2f}  reward={reward:+.2f}  done={done}")
 
-    scores = {
-        "easy": grade_easy(),
-        "medium": grade_medium(),
-        "hard": grade_hard(),
-    }
+    scores = {"easy": grade_easy(), "medium": grade_medium(), "hard": grade_hard()}
     return scores
 
 

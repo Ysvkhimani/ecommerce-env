@@ -1,4 +1,4 @@
-"""E-commerce environment backed by the shared process simulator."""
+"""Customer Support environment — wraps the shared simulator for the HTTP API."""
 
 from __future__ import annotations
 
@@ -6,75 +6,84 @@ import logging
 from typing import Optional
 
 from env import InvalidActionError, get_simulator
-from models import EcommerceAction, EcommerceEnvState, EcommerceObservation
+from models import SupportAction, SupportEnvState, SupportObservation
 
 logger = logging.getLogger(__name__)
 
 
-class EcommerceEnvironment:
-    """Cart RL-style env: reset / step / state (Gradio + scripts use the same instance)."""
+class CustomerSupportEnvironment:
+    """Support ticket RL environment: reset / step / state."""
 
     def __init__(self) -> None:
         self._sim = get_simulator()
         self._state = self._state_from_sim()
 
-    def _state_from_sim(self) -> EcommerceEnvState:
-        sid = self._sim.episode_id or ""
+    def _state_from_sim(self) -> SupportEnvState:
         s = self._sim.state
-        return EcommerceEnvState(
-            episode_id=sid or None,
+        return SupportEnvState(
+            episode_id=self._sim.episode_id or None,
             step_count=len(self._sim.history),
-            cart=list(s.get("cart", [])),
-            total=float(s.get("total", 0)),
-            coupon_applied=bool(s.get("coupon_applied", False)),
-            payment_done=bool(s.get("payment_done", False)),
-            order_status=str(s.get("order_status", "incomplete")),
+            ticket_type=str(s.get("ticket_type", "damaged_item")),
+            ticket_subject=str(s.get("ticket_subject", "")),
+            ticket_description=str(s.get("ticket_description", "")),
+            customer_name=str(s.get("customer_name", "")),
+            customer_tier=str(s.get("customer_tier", "regular")),
+            order_value=float(s.get("order_value", 0.0)),
+            sentiment=float(s.get("sentiment", 0.3)),
+            investigated=bool(s.get("investigated", False)),
+            refund_offered=bool(s.get("refund_offered", False)),
+            exchange_offered=bool(s.get("exchange_offered", False)),
+            discount_applied=bool(s.get("discount_applied", False)),
+            escalated=bool(s.get("escalated", False)),
+            resolved=bool(s.get("resolved", False)),
+            satisfaction_score=float(s.get("satisfaction_score", 0.0)),
             history=list(self._sim.history),
         )
 
-    def reset(
-        self,
-        seed: Optional[int] = None,
-        episode_id: Optional[str] = None,
-        **kwargs: object,
-    ) -> EcommerceObservation:
+    def reset(self, **kwargs: object) -> SupportObservation:
         try:
             self._sim.reset()
         except Exception as e:
-            logger.exception("reset failed")
             raise RuntimeError("Failed to reset environment") from e
         self._state = self._state_from_sim()
         return self._observation(reward=0.0, done=False)
 
-    def step(
-        self,
-        action: EcommerceAction,
-        timeout_s: Optional[float] = None,
-        **kwargs: object,
-    ) -> EcommerceObservation:
+    def step(self, action: SupportAction, **kwargs: object) -> SupportObservation:
         try:
             _s, reward, done = self._sim.step(action.action)
         except InvalidActionError:
             raise
         except Exception as e:
-            logger.exception("step failed for action=%s", getattr(action, "action", action))
             raise RuntimeError("Environment step failed") from e
         self._state = self._state_from_sim()
         return self._observation(reward=reward, done=done)
 
     @property
-    def state(self) -> EcommerceEnvState:
+    def state(self) -> SupportEnvState:
         self._state = self._state_from_sim()
         return self._state
 
-    def _observation(self, reward: float, done: bool) -> EcommerceObservation:
+    def _observation(self, reward: float, done: bool) -> SupportObservation:
         s = self._sim.state
-        return EcommerceObservation(
-            cart=list(s.get("cart", [])),
-            total=float(s.get("total", 0)),
-            coupon_applied=bool(s.get("coupon_applied", False)),
-            payment_done=bool(s.get("payment_done", False)),
-            order_status=str(s.get("order_status", "incomplete")),
+        return SupportObservation(
+            ticket_type=str(s.get("ticket_type", "damaged_item")),
+            ticket_subject=str(s.get("ticket_subject", "")),
+            ticket_description=str(s.get("ticket_description", "")),
+            customer_name=str(s.get("customer_name", "")),
+            customer_tier=str(s.get("customer_tier", "regular")),
+            order_value=float(s.get("order_value", 0.0)),
+            sentiment=float(s.get("sentiment", 0.3)),
+            investigated=bool(s.get("investigated", False)),
+            refund_offered=bool(s.get("refund_offered", False)),
+            exchange_offered=bool(s.get("exchange_offered", False)),
+            discount_applied=bool(s.get("discount_applied", False)),
+            escalated=bool(s.get("escalated", False)),
+            resolved=bool(s.get("resolved", False)),
+            satisfaction_score=float(s.get("satisfaction_score", 0.0)),
             reward=reward,
             done=done,
         )
+
+
+# Backward-compat alias
+EcommerceEnvironment = CustomerSupportEnvironment
