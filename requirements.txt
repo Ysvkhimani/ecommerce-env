@@ -1,13 +1,19 @@
-# Core web framework + ASGI server
-fastapi==0.115.12
-uvicorn[standard]==0.34.0
+# OpenEnv framework (required for openenv validate compliance)
+openenv-core[core]>=0.2.2
 
-# Gradio UI (mounted inside FastAPI)
-gradio==5.50.0
-gradio-client==1.14.0
+# Web framework + ASGI server
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
 
-# HF Hub (must be compatible with gradio 5.50)
-huggingface-hub==0.34.6
+# Gradio UI (mounted by openenv.core's create_app)
+gradio>=5.50.0
+gradio-client>=1.14.0
+
+# HuggingFace
+huggingface-hub>=0.34.0
 
 # Data validation
-pydantic==2.12.3
+pydantic>=2.10.0
+
+# LLM inference (for inference.py)
+openai>=1.0.0

@@ -1,13 +1,35 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "ecommerce-env"
 version = "0.1.0"
-description = "OpenEnv E-commerce environment"
-authors = [
-    {name = "Yashvi"}
-]
+description = "E-commerce cart simulation OpenEnv environment"
+requires-python = ">=3.10"
 dependencies = [
-    "huggingface-hub==0.34.6",
-    "gradio-client==1.14.0",
-    "gradio==5.50.0",
-    "pydantic==2.12.3",
+    # OpenEnv framework (required for openenv validate)
+    "openenv-core[core]>=0.2.2",
+    # Web framework + UI
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "gradio>=5.50.0",
+    "gradio-client>=1.14.0",
+    # HuggingFace
+    "huggingface-hub>=0.34.0",
+    # Validation
+    "pydantic>=2.10.0",
+    # LLM inference (for inference.py)
+    "openai>=1.0.0",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[project.scripts]
+# Enables: uv run server
+server = "server.app:main"
+
+[tool.setuptools]
+include-package-data = true
+packages = ["server"]
