@@ -1,6 +1,13 @@
-# Pin huggingface-hub BEFORE gradio. Must be >=0.33.5 for Gradio 5.50 and >=0.25 for HF base `datasets`.
-# Gradio 4.x + hub 0.24.x is no longer needed; Gradio 5 works with current hub (no HfFolder issue).
-huggingface-hub==0.34.6
-gradio-client==1.14.0
+# Core web framework + ASGI server
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+
+# Gradio UI (mounted inside FastAPI)
 gradio==5.50.0
+gradio-client==1.14.0
+
+# HF Hub (must be compatible with gradio 5.50)
+huggingface-hub==0.34.6
+
+# Data validation
 pydantic==2.12.3

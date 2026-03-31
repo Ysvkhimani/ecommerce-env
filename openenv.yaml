@@ -1,36 +1,74 @@
-version: 1
+name: ecommerce-env
+version: "1.0"
+description: >
+  E-commerce cart simulation OpenEnv environment.
+  An AI agent navigates a shopping cart workflow through four discrete actions
+  (add_item, apply_coupon, checkout, pay) and is rewarded based on task completion.
 
-name: ecommerce_env
+author: Y0120
 
-entrypoint: app:app
-
+# ── Tasks (easy → medium → hard) ──────────────────────────────────────────────
 tasks:
-  - name: easy
-    description: Complete purchase
-  - name: medium
-    description: Apply coupon and purchase
-  - name: hard
-    description: Follow full correct flow
+  - id: easy
+    description: "Complete a purchase: add at least one item and pay"
+    difficulty: easy
+    scoring: "1.0 if payment completed, else 0.0"
 
+  - id: medium
+    description: "Complete a purchase with a coupon applied before paying"
+    difficulty: medium
+    scoring: "1.0 if paid with coupon, 0.5 if paid without coupon, else 0.0"
+
+  - id: hard
+    description: "Complete purchase in exact order: add_item → apply_coupon → checkout → pay"
+    difficulty: hard
+    scoring: "1.0 if exact sequence followed, 0.5 if paid (wrong order), else 0.0"
+
+# ── Action space ───────────────────────────────────────────────────────────────
 action_space:
-  type: object
-  properties:
-    action:
-      type: string
-      enum: ["add_item", "apply_coupon", "checkout", "pay"]
+  type: discrete
+  actions:
+    - name: add_item
+      description: "Add a $100 item to the cart"
+    - name: apply_coupon
+      description: "Apply a 10% discount coupon (once per episode)"
+    - name: checkout
+      description: "Proceed to checkout stage"
+    - name: pay
+      description: "Complete payment and close the order"
 
+# ── Observation space ──────────────────────────────────────────────────────────
 observation_space:
-  type: object
-  properties:
-    cart:
-      type: array
-      items:
-        type: string
-    total:
-      type: number
-    coupon_applied:
-      type: boolean
-    payment_done:
-      type: boolean
-    order_status:
-      type: string
+  cart:
+    type: array
+    items: string
+    description: "Items currently in the cart"
+  total:
+    type: number
+    description: "Current cart total (after any coupon)"
+  coupon_applied:
+    type: boolean
+    description: "Whether the coupon has been applied this episode"
+  payment_done:
+    type: boolean
+    description: "Whether payment has been completed"
+  order_status:
+    type: string
+    enum: [incomplete, completed]
+    description: "Current order status"
+  reward:
+    type: number
+    description: "Reward signal for the last action"
+  done:
+    type: boolean
+    description: "Whether the episode has ended"
+
+# ── HTTP endpoints ─────────────────────────────────────────────────────────────
+endpoints:
+  reset:    "POST /reset"
+  step:     "POST /step"
+  state:    "GET  /state"
+  grader:   "GET  /grader"
+  tasks:    "GET  /tasks"
+  baseline: "POST /baseline"
+  ui:       "GET  /ui"
