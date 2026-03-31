@@ -34,12 +34,12 @@ from openenv.core.env_server.http_server import create_app
 try:
     from .ecommerce_environment import CustomerSupportEnv
     from ..models import SupportAction, SupportObservation
-    from ..grader import grade_easy, grade_hard, grade_medium
+    from ..grader import grade_easy, grade_hard, grade_medium, grade_expert
     from ..env import OPTIMAL_POLICY, OPTIMAL_POLICIES, TICKET_SCENARIOS
 except ImportError:
     from server.ecommerce_environment import CustomerSupportEnv
     from models import SupportAction, SupportObservation
-    from grader import grade_easy, grade_hard, grade_medium
+    from grader import grade_easy, grade_hard, grade_medium, grade_expert
     from env import OPTIMAL_POLICY, OPTIMAL_POLICIES, TICKET_SCENARIOS
 
 # ---------------------------------------------------------------------------
@@ -78,6 +78,16 @@ TASKS = [
         ),
         "difficulty": "hard",
         "scoring": "1.0 (correct+efficient), 0.7 (correct+satisfied), 0.5 (correct), 0.3 (wrong action)",
+    },
+    {
+        "id": "expert",
+        "description": (
+            "Near-perfect resolution: correct resolution for ticket type, "
+            "satisfaction ≥ 0.8, ≤ 4 steps, no escalation, no customer hang-up. "
+            "Forces the agent to act decisively with maximum efficiency."
+        ),
+        "difficulty": "expert",
+        "scoring": "1.0 (perfect), 0.6 (correct+satisfied+≤5 steps), 0.3 (correct but slow), 0.0 (wrong/unresolved)",
     },
 ]
 
@@ -257,9 +267,10 @@ code{color:#93c5fd;font-family:monospace}
     <!-- Grader -->
     <div class="card">
       <h2>🏆 Grader Scores</h2>
-      <div class="score-row"><span><span class="tag tag-e">EASY</span> resolve ticket</span><span id="gEasy" class="sbadge" style="background:#166534;color:#86efac">0.00</span></div>
-      <div class="score-row"><span><span class="tag tag-m">MEDIUM</span> satisfaction score</span><span id="gMed" class="sbadge" style="background:#854d0e;color:#fde68a">0.00</span></div>
-      <div class="score-row"><span><span class="tag tag-h">HARD</span> correct + efficient</span><span id="gHard" class="sbadge" style="background:#7f1d1d;color:#fca5a5">0.00</span></div>
+        <div class="score-row"><span><span class="tag tag-e">EASY</span> resolve ticket</span><span id="gEasy" class="sbadge" style="background:#166534;color:#86efac">0.00</span></div>
+        <div class="score-row"><span><span class="tag tag-m">MEDIUM</span> satisfaction score</span><span id="gMed" class="sbadge" style="background:#854d0e;color:#fde68a">0.00</span></div>
+        <div class="score-row"><span><span class="tag tag-h">HARD</span> correct + efficient</span><span id="gHard" class="sbadge" style="background:#7f1d1d;color:#fca5a5">0.00</span></div>
+        <div class="score-row"><span><span class="tag" style="background:#3b0764;color:#e9d5ff">EXPERT</span> ≤4 steps + sat≥0.8</span><span id="gExpert" class="sbadge" style="background:#3b0764;color:#e9d5ff">0.00</span></div>
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid #334155;font-size:0.75rem;color:#64748b">
         <div style="margin-bottom:6px;font-weight:600;color:#94a3b8">CORRECT ACTION PER TICKET TYPE</div>
         <div>📦 damaged_item → <code>offer_refund</code> / <code>offer_exchange</code></div>
@@ -324,6 +335,7 @@ async function refreshGrader(){
   document.getElementById('gEasy').textContent=g.easy.toFixed(2);
   document.getElementById('gMed').textContent=g.medium.toFixed(2);
   document.getElementById('gHard').textContent=g.hard.toFixed(2);
+  document.getElementById('gExpert').textContent=(g.expert||0).toFixed(2);
 }
 
 async function doReset(){
@@ -380,9 +392,14 @@ async function doStep(action){
   toast(action+'  '+(reward>=0?'+':'')+Number(reward).toFixed(2),col);
   if(data.done){
     const sat=s.satisfaction_score||0;
-    const stars='⭐'.repeat(Math.round(sat*5));
-    addMsg('customer','','[TICKET CLOSED] Satisfaction: '+sat.toFixed(2)+' '+stars);
-    toast('🎉 Resolved! Score: '+sat.toFixed(2),'#1e40af');
+    if(s.resolved){
+      const stars='⭐'.repeat(Math.round(sat*5));
+      addMsg('customer','','[TICKET CLOSED] Satisfaction: '+sat.toFixed(2)+' '+stars);
+      toast('🎉 Resolved! Score: '+sat.toFixed(2),'#1e40af');
+    } else {
+      addMsg('customer','','☎️ [CUSTOMER HUNG UP] They filed a chargeback. Score: 0.00');
+      toast('💔 Customer hung up — episode over','#7f1d1d');
+    }
   }
 }
 
@@ -408,6 +425,7 @@ async def get_grader() -> dict[str, float]:
         "easy": grade_easy(),
         "medium": grade_medium(),
         "hard": grade_hard(),
+        "expert": grade_expert(),
     }
 
 
@@ -449,7 +467,7 @@ async def run_baseline() -> dict[str, Any]:
             "ticket_type": ticket_type,
             "policy": " → ".join(policy),
             "episode": episode,
-            "scores": {"easy": grade_easy(), "medium": grade_medium(), "hard": grade_hard()},
+            "scores": {"easy": grade_easy(), "medium": grade_medium(), "hard": grade_hard(), "expert": grade_expert()},
         })
 
     return {"scenarios": results}

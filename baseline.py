@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from env import OPTIMAL_POLICIES, TICKET_SCENARIOS, reset, step
-from grader import grade_easy, grade_hard, grade_medium
+from grader import grade_easy, grade_expert, grade_hard, grade_medium
 
 
 def run_episode(ticket_index: int) -> dict:
@@ -38,7 +38,7 @@ def run_episode(ticket_index: int) -> dict:
         s, reward, done = step(action)
         print(f"    {action:20s}  sentiment={s['sentiment']:.2f}  reward={reward:+.2f}")
 
-    return {"easy": grade_easy(), "medium": grade_medium(), "hard": grade_hard()}
+    return {"easy": grade_easy(), "medium": grade_medium(), "hard": grade_hard(), "expert": grade_expert()}
 
 
 if __name__ == "__main__":
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     for i, scenario in enumerate(TICKET_SCENARIOS):
         scores = run_episode(i)
         all_scores[scenario["type"]] = scores
-        print(f"  Scores: easy={scores['easy']:.2f}  medium={scores['medium']:.2f}  hard={scores['hard']:.2f}")
+        print(f"  Scores: easy={scores['easy']:.2f}  medium={scores['medium']:.2f}  hard={scores['hard']:.2f}  expert={scores['expert']:.2f}")
 
     print("\n" + "=" * 50)
     print("All baseline scores:")

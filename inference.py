@@ -35,7 +35,7 @@ TEMPERATURE = 0.0
 MAX_TOKENS = 30
 
 from ecommerce_environment import CustomerSupportEnvironment
-from grader import grade_easy, grade_hard, grade_medium
+from grader import grade_easy, grade_expert, grade_hard, grade_medium
 from models import SupportAction
 
 VALID_ACTIONS = [
@@ -73,6 +73,7 @@ TASKS = [
     ("easy",   "Resolve the customer support ticket."),
     ("medium", "Resolve the ticket with high customer satisfaction."),
     ("hard",   "Resolve correctly: use the right action for the ticket type, ≤6 steps, no escalation."),
+    ("expert", "Near-perfect resolution: correct action for ticket type, satisfaction ≥ 0.8, ≤ 4 steps, no escalation."),
 ]
 
 
@@ -122,7 +123,7 @@ def run_task(client: OpenAI, task_id: str, task_desc: str) -> float:
         if obs.done:
             break
 
-    scores = {"easy": grade_easy(), "medium": grade_medium(), "hard": grade_hard()}
+    scores = {"easy": grade_easy(), "medium": grade_medium(), "hard": grade_hard(), "expert": grade_expert()}
     return scores[task_id]
 
 

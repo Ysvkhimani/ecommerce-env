@@ -359,8 +359,22 @@ class CustomerSupportSimulator:
         # Small per-step cost encourages efficient resolution
         reward -= 0.01
 
-        # Update customer response
-        s["customer_response"] = sc["responses"].get(action, "...")
+        # Impatience: sentiment decays every step after the 5th (not on resolve)
+        if not done and len(self.history) >= 5:
+            s["sentiment"] = max(0.0, s["sentiment"] - 0.05)
+
+        # Customer hang-up: extreme frustration ends the episode
+        if not done and s["sentiment"] <= 0.05:
+            s["customer_response"] = (
+                "I've had enough. I'm cancelling my account and filing a chargeback."
+            )
+            s["satisfaction_score"] = 0.0
+            reward -= 0.50
+            done = True
+        else:
+            # Update customer response normally
+            s["customer_response"] = sc["responses"].get(action, "...")
+
         self.history.append(action)
         return copy.deepcopy(s), reward, done
 

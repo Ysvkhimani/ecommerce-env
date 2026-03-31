@@ -84,13 +84,14 @@ The observation includes the **full ticket text**, **customer's latest response*
 
 ---
 
-## Tasks & Graders
+## Tasks & Graders (4 levels)
 
 | ID | Objective | Scoring |
 |---|---|---|
 | `easy` | Resolve the ticket — any resolution counts | `1.0` if resolved, `0.0` otherwise |
-| `medium` | Resolve with meaningful customer satisfaction | `satisfaction_score` if resolved (min 0.3 for any resolution) |
+| `medium` | Resolve with meaningful customer satisfaction | `satisfaction_score` if resolved (min 0.3) |
 | `hard` | Resolve correctly and efficiently | See below |
+| `expert` | Near-perfect: correct action + max satisfaction + minimum steps | See below |
 
 **Hard task scoring:**
 
@@ -102,19 +103,30 @@ The observation includes the **full ticket text**, **customer's latest response*
 | Resolved but wrong resolution or escalated | **0.3** |
 | Not resolved | **0.0** |
 
-The hard task requires the agent to *read the ticket, infer the correct action type, and execute efficiently*. A model that blindly applies `offer_refund` on every ticket gets `0.3` on hard for late_delivery and billing_issue tickets.
+**Expert task scoring:**
+
+| Conditions | Score |
+|---|---|
+| Correct resolution + satisfaction ≥ 0.8 + steps ≤ 4 + no escalation | **1.0** |
+| Correct resolution + satisfaction ≥ 0.7 + steps ≤ 5 + no escalation | **0.6** |
+| Correct resolution + no escalation (any satisfaction/steps) | **0.3** |
+| Wrong resolution, unresolved, or customer hung up | **0.0** |
+
+The expert task is genuinely hard: `late_delivery` needs 5 steps (maximum 0.6), and `billing_issue` starts at very low sentiment (0.15). Even the deterministic optimal policy scores 0.6 on these — frontier models must figure out the context and act with maximum precision.
 
 ---
 
 ## Baseline Scores (Optimal Policy)
 
-| Ticket Type | Optimal Policy | Easy | Medium | Hard |
-|---|---|---|---|---|
-| `damaged_item` | acknowledge → investigate → offer_refund → resolve | 1.0 | 0.90 | 1.0 |
-| `wrong_item` | acknowledge → investigate → offer_exchange → resolve | 1.0 | 0.90 | 1.0 |
-| `missing_item` | acknowledge → investigate → offer_refund → resolve | 1.0 | 0.85 | 1.0 |
-| `late_delivery` | acknowledge → investigate → send_update → apply_discount → resolve | 1.0 | 0.90 | 1.0 |
-| `billing_issue` | acknowledge → investigate → offer_refund → resolve | 1.0 | 0.75 | 1.0 |
+| Ticket Type | Optimal Policy | Easy | Medium | Hard | Expert |
+|---|---|---|---|---|---|
+| `damaged_item` | ack → investigate → offer_refund → resolve | 1.0 | 0.90 | 1.0 | **1.0** |
+| `wrong_item` | ack → investigate → offer_exchange → resolve | 1.0 | 0.90 | 1.0 | **1.0** |
+| `missing_item` | ack → investigate → offer_refund → resolve | 1.0 | 0.85 | 1.0 | **1.0** |
+| `late_delivery` | ack → investigate → send_update → apply_discount → resolve | 1.0 | 0.90 | 1.0 | **0.6** |
+| `billing_issue` | ack → investigate → offer_refund → resolve | 1.0 | 0.75 | 1.0 | **0.6** |
+
+`late_delivery` requires 5 steps by design (cannot achieve expert=1.0). `billing_issue` starts at very low sentiment (0.15), making satisfaction ≥ 0.8 unreachable in 4 steps — the expert task is *genuinely hard*.
 
 ---
 
@@ -129,6 +141,8 @@ Rewards are shaped across the **full trajectory** — not just at episode end:
 5. **Repetition penalty** — repeating the same action gives negative reward (`−0.05` to `−0.10`).
 6. **Step cost** — `−0.01` per step discourages padding and rewards efficient resolution.
 7. **Terminal reward** — `resolve` returns the current sentiment score (0.0–1.0) as a dense continuous signal.
+8. **Impatience decay** — After step 5, customer sentiment decreases `−0.05` per step. The longer the agent stalls, the harder it becomes to achieve high satisfaction.
+9. **Customer hang-up** — If sentiment drops to ≤ 0.05 (from escalating VIP customers, repeated bad actions, or impatience), the customer files a chargeback and the episode ends with `done=True` and a `−0.50` penalty. Models must learn not to compound mistakes.
 
 This design ensures gradients flow throughout the episode, making the environment suitable for policy gradient RL methods, not just supervised/imitation learning.
 

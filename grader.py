@@ -44,6 +44,43 @@ def grade_medium() -> float:
         return 0.0
 
 
+def grade_expert() -> float:
+    """Expert task: near-perfect resolution — correct action, minimum steps, maximum satisfaction.
+
+    This is designed to challenge frontier models. Requirements:
+      - Ticket resolved without customer hanging up
+      - Correct resolution action for the ticket type
+      - No escalation
+      - Satisfaction ≥ 0.8 AND steps ≤ 4 for full score
+
+    Scoring:
+      1.0  → correct + satisfaction ≥ 0.8 + steps ≤ 4 + no escalation
+      0.6  → correct + satisfaction ≥ 0.7 + steps ≤ 5 + no escalation
+      0.3  → correct + no escalation (any satisfaction/steps)
+      0.0  → not resolved, wrong resolution, or customer hung up
+    """
+    try:
+        s = _read_state()
+        h = _read_history()
+        if not s.get("resolved"):
+            return 0.0
+        satisfaction = float(s.get("satisfaction_score", 0.0))
+        steps = len(h)
+        escalated = bool(s.get("escalated", False))
+        correct = bool(s.get("correct_resolution_used", False))
+
+        if correct and satisfaction >= 0.8 and steps <= 4 and not escalated:
+            return 1.0
+        if correct and satisfaction >= 0.7 and steps <= 5 and not escalated:
+            return 0.6
+        if correct and not escalated:
+            return 0.3
+        return 0.0
+    except Exception:
+        logger.exception("grade_expert failed")
+        return 0.0
+
+
 def grade_hard() -> float:
     """Task: Resolve correctly and efficiently.
 
