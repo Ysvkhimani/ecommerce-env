@@ -1,4 +1,4 @@
-"""OpenEnv-compliant CustomerSupportEnv wrapping the shared simulator."""
+"""OpenEnv-compliant CustomerSupportEnv."""
 
 from __future__ import annotations
 
@@ -21,8 +21,6 @@ except ImportError:
 
 
 class CustomerSupportEnv(Environment):
-    """Customer support ticket environment (openenv.core compliant)."""
-
     SUPPORTS_CONCURRENT_SESSIONS: bool = False
 
     def __init__(self) -> None:
@@ -41,32 +39,33 @@ class CustomerSupportEnv(Environment):
 
     @property
     def state(self) -> State:
-        return State(
-            episode_id=self._sim.episode_id,
-            step_count=len(self._sim.history),
-        )
+        return State(episode_id=self._sim.episode_id, step_count=len(self._sim.history))
 
     def _obs(self, reward: float, done: bool) -> SupportObservation:
         s = self._sim.state
         return SupportObservation(
-            ticket_type=str(s.get("ticket_type", "damaged_item")),
+            ticket_id=str(s.get("ticket_id", "")),
+            ticket_type=str(s.get("ticket_type", "")),
             ticket_subject=str(s.get("ticket_subject", "")),
             ticket_description=str(s.get("ticket_description", "")),
             customer_name=str(s.get("customer_name", "")),
             customer_tier=str(s.get("customer_tier", "regular")),
             order_value=float(s.get("order_value", 0.0)),
+            correct_resolutions=list(s.get("correct_resolutions", [])),
             sentiment=float(s.get("sentiment", 0.3)),
             investigated=bool(s.get("investigated", False)),
             refund_offered=bool(s.get("refund_offered", False)),
             exchange_offered=bool(s.get("exchange_offered", False)),
             discount_applied=bool(s.get("discount_applied", False)),
+            update_sent=bool(s.get("update_sent", False)),
             escalated=bool(s.get("escalated", False)),
             resolved=bool(s.get("resolved", False)),
             satisfaction_score=float(s.get("satisfaction_score", 0.0)),
+            correct_resolution_used=bool(s.get("correct_resolution_used", False)),
+            customer_response=str(s.get("customer_response", "")),
             reward=reward,
             done=done,
         )
 
 
-# Alias used by server/app.py
 EcommerceEnv = CustomerSupportEnv

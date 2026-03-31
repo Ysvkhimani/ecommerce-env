@@ -1,8 +1,9 @@
 """
 Inference Script — E-commerce Customer Support Agent
 =====================================================
-An LLM agent (via OpenAI-compatible API) acts as a customer support representative.
-It reads a customer ticket and chooses actions to resolve it.
+An LLM agent resolves customer support tickets by reading the ticket type
+and choosing the appropriate actions. The agent must generalise across
+5 different ticket scenarios.
 
 MANDATORY environment variables:
     API_BASE_URL   LLM endpoint  (e.g. https://router.huggingface.co/v1)
@@ -29,7 +30,7 @@ API_BASE_URL: str = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1"
 API_KEY: str = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or ""
 MODEL_NAME: str = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 
-MAX_STEPS = 10
+MAX_STEPS = 12
 TEMPERATURE = 0.0
 MAX_TOKENS = 30
 
@@ -39,32 +40,39 @@ from models import SupportAction
 
 VALID_ACTIONS = [
     "acknowledge", "investigate", "offer_refund", "offer_exchange",
-    "apply_discount", "escalate", "request_info", "resolve",
+    "apply_discount", "send_update", "escalate", "request_info", "resolve",
 ]
 
 SYSTEM_PROMPT = textwrap.dedent("""
     You are an AI customer support agent for an e-commerce store.
-    A customer has submitted a support ticket. Your goal is to resolve it
-    efficiently while keeping the customer satisfied.
+    Each episode you receive a NEW customer ticket. Read it carefully —
+    the ticket type determines the best resolution action.
 
     Available actions:
-      acknowledge   — Acknowledge the customer's issue (builds trust)
-      investigate   — Look up the order details (required before offering solutions)
-      offer_refund  — Issue a full refund (best for damaged/wrong items)
-      offer_exchange — Send a replacement item (alternative to refund)
-      apply_discount — Give 10%% off next order as goodwill gesture
-      escalate      — Transfer to senior agent (use only if necessary)
-      request_info  — Ask customer for more info (use only if missing details)
-      resolve       — Close the ticket (do this after offering a solution)
+      acknowledge   — Acknowledge the issue (always a good first step)
+      investigate   — Look up order/account details (do this before offering solutions)
+      offer_refund  — Issue full refund (best for: damaged, missing, wrong items)
+      offer_exchange — Send replacement (best for: wrong item, damaged item)
+      apply_discount — Give 10%% off next order (best for: late delivery)
+      send_update   — Send delivery status update (best for: late delivery)
+      escalate      — Transfer to senior agent (avoid — penalised)
+      request_info  — Ask for more info (avoid if info already given — penalised)
+      resolve       — Close the ticket (do AFTER offering appropriate solution)
 
-    Reply with ONLY the action name — nothing else.
-    Best practice: acknowledge → investigate → offer_refund/offer_exchange → resolve
+    IMPORTANT: Match your resolution to the ticket type!
+    - damaged_item  → offer_refund or offer_exchange, then resolve
+    - wrong_item    → offer_exchange or offer_refund, then resolve
+    - missing_item  → offer_refund or offer_exchange, then resolve
+    - late_delivery → send_update, apply_discount, then resolve
+    - billing_issue → investigate (to confirm charge), then resolve
+
+    Reply with ONLY the action name.
 """).strip()
 
 TASKS = [
-    ("easy",   "Resolve the customer support ticket — any resolution counts."),
+    ("easy",   "Resolve the customer support ticket."),
     ("medium", "Resolve the ticket with high customer satisfaction."),
-    ("hard",   "Resolve efficiently: satisfaction ≥ 0.8, ≤ 5 steps, no escalation."),
+    ("hard",   "Resolve correctly: use the right action for the ticket type, ≤6 steps, no escalation."),
 ]
 
 
@@ -81,22 +89,20 @@ def run_task(client: OpenAI, task_id: str, task_desc: str) -> float:
     obs = env.reset()
 
     messages = [
-        {
-            "role": "system",
-            "content": SYSTEM_PROMPT + f"\n\nYour current objective: {task_desc}",
-        }
+        {"role": "system", "content": SYSTEM_PROMPT + f"\n\nYour objective: {task_desc}"}
     ]
 
     for step_num in range(1, MAX_STEPS + 1):
         user_content = (
             f"Step {step_num}/{MAX_STEPS}\n"
-            f"Ticket: {obs.ticket_subject}\n"
-            f"Customer message: {obs.ticket_description}\n"
-            f"Customer: {obs.customer_name} ({obs.customer_tier} tier)\n"
-            f"Current sentiment: {obs.sentiment:.2f} (0=very angry, 1=very happy)\n"
-            f"Investigated: {obs.investigated} | Refund offered: {obs.refund_offered} | "
-            f"Exchange offered: {obs.exchange_offered} | Resolved: {obs.resolved}\n\n"
-            f"What action do you take? ({' / '.join(VALID_ACTIONS)})"
+            f"Ticket type: {obs.ticket_type}\n"
+            f"Subject: {obs.ticket_subject}\n"
+            f"Customer ({obs.customer_name}, {obs.customer_tier}): {obs.ticket_description}\n"
+            f"Customer's latest message: \"{obs.customer_response}\"\n"
+            f"Sentiment: {obs.sentiment:.2f} | Investigated: {obs.investigated} | "
+            f"Refund: {obs.refund_offered} | Exchange: {obs.exchange_offered} | "
+            f"Update sent: {obs.update_sent} | Resolved: {obs.resolved}\n\n"
+            f"Choose action: ({' / '.join(VALID_ACTIONS)})"
         )
         messages.append({"role": "user", "content": user_content})
 
@@ -109,11 +115,10 @@ def run_task(client: OpenAI, task_id: str, task_desc: str) -> float:
         action_text = response.choices[0].message.content or ""
         chosen = _extract_action(action_text)
         messages.append({"role": "assistant", "content": chosen})
-        print(f"    step {step_num:2d}: {chosen:20s}  sentiment={obs.sentiment:.2f}")
+        print(f"    step {step_num:2d}: {chosen:20s}  sentiment={obs.sentiment:.2f}  customer: \"{obs.customer_response[:50]}\"")
 
         act = SupportAction(action=chosen)
         obs = env.step(act)
-
         if obs.done:
             break
 
@@ -123,19 +128,15 @@ def run_task(client: OpenAI, task_id: str, task_desc: str) -> float:
 
 def main() -> dict[str, float]:
     if not API_KEY:
-        print("WARNING: HF_TOKEN / API_KEY not set.", file=sys.stderr)
-
+        print("WARNING: HF_TOKEN not set.", file=sys.stderr)
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
     results: dict[str, float] = {}
-
     for task_id, task_desc in TASKS:
         print(f"\n[Task: {task_id}] {task_desc}")
         score = run_task(client, task_id, task_desc)
         results[task_id] = score
         print(f"  -> score: {score:.2f}")
-
     print("\n" + "=" * 40)
-    print("Baseline scores:")
     print(json.dumps(results, indent=2))
     return results
 

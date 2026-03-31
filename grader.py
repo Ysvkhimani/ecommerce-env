@@ -1,4 +1,4 @@
-"""Grading helpers — read the shared simulator state after an episode."""
+"""Grading helpers — evaluates the quality of ticket resolution."""
 
 from __future__ import annotations
 
@@ -20,8 +20,7 @@ def _read_history() -> List[str]:
 
 def grade_easy() -> float:
     """Task: Resolve the ticket — any resolution counts.
-
-    Score: 1.0 if ticket is resolved, else 0.0
+    Score: 1.0 if resolved, else 0.0
     """
     try:
         return 1.0 if _read_state().get("resolved") else 0.0
@@ -32,32 +31,35 @@ def grade_easy() -> float:
 
 def grade_medium() -> float:
     """Task: Resolve with meaningful customer satisfaction.
-
-    Score: satisfaction_score (0.0–1.0) if resolved, else 0.0
-    Partial credit at 0.5 for resolving but with low satisfaction (< 0.5).
+    Score: satisfaction_score if resolved (minimum 0.3 for any resolution).
     """
     try:
         s = _read_state()
         if not s.get("resolved"):
             return 0.0
         score = float(s.get("satisfaction_score", 0.0))
-        if score >= 0.7:
-            return score            # e.g. 0.90 sentiment → 0.90 score
-        return max(0.3, score)      # still some credit for resolving
+        return max(0.3, score)
     except Exception:
         logger.exception("grade_medium failed")
         return 0.0
 
 
 def grade_hard() -> float:
-    """Task: Resolve efficiently — high satisfaction, ≤ 5 steps, no escalation.
+    """Task: Resolve correctly and efficiently.
 
-    Scoring rubric:
-      1.0  — resolved + satisfaction ≥ 0.8 + steps ≤ 5 + no escalation
-      0.7  — resolved + satisfaction ≥ 0.7 + no escalation
-      0.5  — resolved + satisfaction ≥ 0.5 + no escalation
-      0.2  — resolved but escalated or too many steps
-      0.0  — not resolved
+    Requires:
+      - Ticket resolved
+      - Correct resolution action used for the ticket type
+      - No escalation
+      - Satisfaction ≥ 0.7
+      - Steps ≤ 6
+
+    Scoring:
+      1.0  → all conditions met
+      0.7  → resolved + correct action + satisfaction ≥ 0.6 + no escalation
+      0.5  → resolved + correct action + any satisfaction
+      0.3  → resolved but wrong action or escalated
+      0.0  → not resolved
     """
     try:
         s = _read_state()
@@ -67,13 +69,15 @@ def grade_hard() -> float:
         satisfaction = float(s.get("satisfaction_score", 0.0))
         steps = len(h)
         escalated = bool(s.get("escalated", False))
-        if satisfaction >= 0.8 and steps <= 5 and not escalated:
+        correct = bool(s.get("correct_resolution_used", False))
+
+        if correct and satisfaction >= 0.7 and steps <= 6 and not escalated:
             return 1.0
-        if satisfaction >= 0.7 and not escalated:
+        if correct and satisfaction >= 0.6 and not escalated:
             return 0.7
-        if satisfaction >= 0.5 and not escalated:
+        if correct and not escalated:
             return 0.5
-        return 0.2  # resolved but poorly
+        return 0.3
     except Exception:
         logger.exception("grade_hard failed")
         return 0.0
