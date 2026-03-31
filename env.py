@@ -333,12 +333,15 @@ class CustomerSupportSimulator:
                 reward = -0.05
 
         elif action == "escalate":
+            # VIP customers react more negatively to escalation
+            vip = s.get("customer_tier") == "vip"
             if not s["escalated"]:
                 s["escalated"] = True
-                s["sentiment"] = max(0.0, s["sentiment"] - 0.10)
-                reward = -0.3
+                penalty = 0.50 if vip else 0.30
+                s["sentiment"] = max(0.0, s["sentiment"] - (0.15 if vip else 0.10))
+                reward = -penalty
             else:
-                reward = -0.2
+                reward = -0.4 if vip else -0.2
 
         elif action == "request_info":
             s["sentiment"] = max(0.0, s["sentiment"] - 0.10)
@@ -352,6 +355,9 @@ class CustomerSupportSimulator:
             s["satisfaction_score"] = round(s["sentiment"], 4)
             reward = s["sentiment"]
             done = True
+
+        # Small per-step cost encourages efficient resolution
+        reward -= 0.01
 
         # Update customer response
         s["customer_response"] = sc["responses"].get(action, "...")

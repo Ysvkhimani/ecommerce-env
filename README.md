@@ -10,37 +10,45 @@ tags:
   - openenv
 ---
 
-# E-commerce Customer Support Agent Environment
+# E-commerce Customer Support Agent — OpenEnv Environment
 
-An **OpenEnv**-compliant environment where an AI agent acts as a **customer service representative** for an e-commerce store. The agent receives a real customer support ticket and must resolve it by choosing the right sequence of actions — balancing empathy, investigation, and resolution quality.
+An **OpenEnv**-compliant RL environment where an AI agent plays the role of a **customer support representative** for an e-commerce store. Each episode the agent receives a **random real-world customer ticket**, must read it carefully to understand the issue, and then choose the right sequence of actions to resolve it efficiently.
 
-> **Why this matters:** AI-powered customer support is one of the fastest-growing applications of LLM agents. This environment lets you train and evaluate agents on a realistic, consequential task that humans do every day.
-
----
-
-## The Scenario
-
-A customer purchased a laptop (Order #ORD-98765, $999). It arrived with a **cracked screen**. They've submitted a ticket demanding resolution.
-
-The agent starts with a frustrated customer (sentiment = 0.3 / 10) and must bring them to satisfaction through careful, empathetic action.
+> **Why this matters:** AI-powered customer support is one of the fastest-growing applications of LLM agents. This environment tests whether an agent can *understand context*, *match resolution to problem type*, and *manage customer sentiment* — skills that directly transfer to production support systems.
 
 ---
 
-## Action Space (8 discrete actions)
+## 5 Ticket Scenarios (randomly sampled per episode)
 
-| Action | Effect | Reward |
-|---|---|---|
-| `acknowledge` | Acknowledge the issue — builds immediate trust | +0.1 |
-| `investigate` | Look up order details — **unlocks better resolution options** | +0.1 |
-| `offer_refund` | Full refund — best outcome if investigated first | +0.5 (investigated) / +0.2 |
-| `offer_exchange` | Send replacement — good alternative to refund | +0.4 (investigated) / +0.1 |
-| `apply_discount` | Goodwill 10% off next order | +0.1 |
-| `escalate` | Transfer to senior agent — frustrates customer | −0.3 |
-| `request_info` | Ask for info already in the ticket — annoys customer | −0.1 |
-| `resolve` | Close ticket — reward = final customer sentiment (0.0–1.0) | 0.0–1.0 |
+| Ticket ID | Type | Customer | Tier | Order Value | Optimal Resolution |
+|---|---|---|---|---|---|
+| TKT-001 | `damaged_item` | Alex | regular | $999 | `offer_refund` / `offer_exchange` |
+| TKT-002 | `wrong_item` | Jordan | **VIP** | $249 | `offer_exchange` / `offer_refund` |
+| TKT-003 | `missing_item` | Sam | new | $149 | `offer_refund` / `offer_exchange` |
+| TKT-004 | `late_delivery` | Casey | regular | $89 | `send_update` + `apply_discount` |
+| TKT-005 | `billing_issue` | Riley | **VIP** | $199 | `investigate` → `offer_refund` |
 
-**Optimal policy:** `acknowledge → investigate → offer_refund → resolve`
-→ Final sentiment: **0.90** | Steps: **4** | Score: **1.0 / 1.0 / 1.0**
+Each ticket has a unique **opening message** and **customer responses per action** — making every episode feel like a real conversation.
+
+The agent **must read the ticket type** to choose the correct resolution. Using `offer_refund` on a `late_delivery` ticket gives reduced reward; using `send_update` on a `billing_issue` gives a negative reward. This tests genuine understanding, not memorisation.
+
+---
+
+## Action Space (9 discrete actions)
+
+| Action | Description | Base Reward | Notes |
+|---|---|---|---|
+| `acknowledge` | Acknowledge the issue — builds trust | `+0.10` | Penalised if repeated |
+| `investigate` | Look up order/account details | `+0.10` | **Unlocks full resolution rewards** |
+| `offer_refund` | Issue full refund | `+0.50` (after investigate) | ✅ Correct for: damaged, missing, wrong, billing |
+| `offer_exchange` | Send replacement item | `+0.45` (after investigate) | ✅ Correct for: wrong, damaged |
+| `apply_discount` | 10% off next order | `+0.30` (correct) / `+0.08` | ✅ Correct for: late_delivery |
+| `send_update` | Send delivery status update | `+0.40` (correct) / `−0.10` | ✅ Correct for: late_delivery only |
+| `escalate` | Transfer to senior agent | `−0.30` (regular) / `−0.50` (**VIP**) | Frustrates customer; extra penalty for VIP |
+| `request_info` | Ask for info already provided | `−0.10` | Penalises agent for lazy behaviour |
+| `resolve` | Close the ticket | `= final sentiment` | Only meaningful after addressing root cause |
+
+**Step cost:** `−0.01` per step — encourages efficient resolution over stalling.
 
 ---
 
@@ -48,34 +56,81 @@ The agent starts with a frustrated customer (sentiment = 0.3 / 10) and must brin
 
 ```json
 {
-  "ticket_type": "damaged_item",
-  "ticket_subject": "My laptop arrived with a cracked screen",
-  "ticket_description": "...",
-  "customer_name": "Alex",
+  "ticket_id": "TKT-004",
+  "ticket_type": "late_delivery",
+  "ticket_subject": "Order still hasn't arrived — it's been 10 days",
+  "ticket_description": "I ordered headphones (Order #ORD-34876, $89) 10 days ago with 5-day delivery...",
+  "customer_name": "Casey",
   "customer_tier": "regular",
-  "order_value": 999.0,
-  "sentiment": 0.75,
+  "order_value": 89.0,
+  "correct_resolutions": ["send_update", "apply_discount"],
+  "sentiment": 0.55,
   "investigated": true,
   "refund_offered": false,
   "exchange_offered": false,
   "discount_applied": false,
+  "update_sent": true,
   "escalated": false,
   "resolved": false,
   "satisfaction_score": 0.0,
-  "reward": 0.1,
+  "correct_resolution_used": true,
+  "customer_response": "Thank you for checking! That's really helpful to know.",
+  "reward": 0.40,
   "done": false
 }
 ```
 
+The observation includes the **full ticket text**, **customer's latest response**, and **which resolutions are correct for this ticket type** — giving the agent everything it needs to act intelligently.
+
 ---
 
-## Tasks (Easy → Hard)
+## Tasks & Graders
 
-| ID | Description | Scoring |
+| ID | Objective | Scoring |
 |---|---|---|
-| `easy` | Resolve the ticket — any resolution counts | 1.0 if resolved |
-| `medium` | Resolve with meaningful customer satisfaction | satisfaction_score if resolved |
-| `hard` | Resolve efficiently: satisfaction ≥ 0.8, ≤ 5 steps, no escalation | 1.0 / 0.7 / 0.5 / 0.2 |
+| `easy` | Resolve the ticket — any resolution counts | `1.0` if resolved, `0.0` otherwise |
+| `medium` | Resolve with meaningful customer satisfaction | `satisfaction_score` if resolved (min 0.3 for any resolution) |
+| `hard` | Resolve correctly and efficiently | See below |
+
+**Hard task scoring:**
+
+| Conditions | Score |
+|---|---|
+| Correct resolution + satisfaction ≥ 0.7 + steps ≤ 6 + no escalation | **1.0** |
+| Correct resolution + satisfaction ≥ 0.6 + no escalation | **0.7** |
+| Correct resolution used + no escalation | **0.5** |
+| Resolved but wrong resolution or escalated | **0.3** |
+| Not resolved | **0.0** |
+
+The hard task requires the agent to *read the ticket, infer the correct action type, and execute efficiently*. A model that blindly applies `offer_refund` on every ticket gets `0.3` on hard for late_delivery and billing_issue tickets.
+
+---
+
+## Baseline Scores (Optimal Policy)
+
+| Ticket Type | Optimal Policy | Easy | Medium | Hard |
+|---|---|---|---|---|
+| `damaged_item` | acknowledge → investigate → offer_refund → resolve | 1.0 | 0.90 | 1.0 |
+| `wrong_item` | acknowledge → investigate → offer_exchange → resolve | 1.0 | 0.90 | 1.0 |
+| `missing_item` | acknowledge → investigate → offer_refund → resolve | 1.0 | 0.85 | 1.0 |
+| `late_delivery` | acknowledge → investigate → send_update → apply_discount → resolve | 1.0 | 0.90 | 1.0 |
+| `billing_issue` | acknowledge → investigate → offer_refund → resolve | 1.0 | 0.75 | 1.0 |
+
+---
+
+## Reward Design
+
+Rewards are shaped across the **full trajectory** — not just at episode end:
+
+1. **Per-action partial rewards** — `acknowledge` and `investigate` give immediate signal even early in the episode.
+2. **Context-dependent bonus** — `offer_refund` gives `+0.50` only if `investigated` is `True`, otherwise `+0.20`. Forces the agent to build context before acting.
+3. **Ticket-type matching** — correct resolutions give full reward; wrong resolutions give partial or negative reward. Agent must reason about ticket content.
+4. **Escalation penalty** — `−0.30` for regular customers, `−0.50` for VIP customers. Teaches sensitivity to customer tier.
+5. **Repetition penalty** — repeating the same action gives negative reward (`−0.05` to `−0.10`).
+6. **Step cost** — `−0.01` per step discourages padding and rewards efficient resolution.
+7. **Terminal reward** — `resolve` returns the current sentiment score (0.0–1.0) as a dense continuous signal.
+
+This design ensures gradients flow throughout the episode, making the environment suitable for policy gradient RL methods, not just supervised/imitation learning.
 
 ---
 
@@ -83,14 +138,14 @@ The agent starts with a frustrated customer (sentiment = 0.3 / 10) and must brin
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/` | Health check |
-| `GET` | `/tasks` | Task list + action schema |
-| `POST` | `/reset` | Start new episode |
-| `POST` | `/step` | Execute `{"action": {"action": "acknowledge"}}` |
+| `GET` | `/` | Interactive UI — playable in browser |
+| `GET` | `/tasks` | Task list + full action schema |
+| `POST` | `/reset` | Start new episode (samples random ticket) |
+| `POST` | `/step` | Execute `{"action": {"action": "send_update"}}` |
 | `GET` | `/state` | Current episode state |
 | `GET` | `/grader` | Live grader scores (easy / medium / hard) |
-| `POST` | `/baseline` | Run optimal policy, return scores |
-| `GET` | `/docs` | Interactive API docs (Swagger) |
+| `POST` | `/baseline` | Run optimal policy for all 5 ticket types |
+| `GET` | `/docs` | Swagger UI |
 
 ---
 
@@ -100,17 +155,20 @@ The agent starts with a frustrated customer (sentiment = 0.3 / 10) and must brin
 ```bash
 docker build -t ecommerce-support-env .
 docker run -p 7860:7860 ecommerce-support-env
+# → http://localhost:7860
 ```
 
-### Python
+### Python (dev)
 ```bash
 pip install -r requirements.txt
-uvicorn server.app:app --port 7860
+uvicorn server.app:app --host 0.0.0.0 --port 7860 --reload
 ```
 
-### Baseline (no LLM)
+### Baseline (deterministic, no LLM)
 ```bash
 python baseline.py
+# Runs optimal policy for all 5 ticket types
+# → easy: 1.0, medium: 0.75–0.90, hard: 1.0 (all scenarios)
 ```
 
 ### Inference (LLM agent)
@@ -119,21 +177,26 @@ export API_BASE_URL="https://router.huggingface.co/v1"
 export MODEL_NAME="Qwen/Qwen2.5-72B-Instruct"
 export HF_TOKEN="hf_..."
 python inference.py
-```
-
-**Expected baseline scores:**
-```json
-{ "easy": 1.0, "medium": 0.9, "hard": 1.0 }
+# Runs 3 tasks; prints per-task scores
 ```
 
 ---
 
-## Reward Design
+## Project Structure
 
-Rewards are shaped across the full trajectory — not just at episode end:
-- **Partial rewards** for each beneficial action (acknowledge, investigate)
-- **Multiplicative bonus** for combining investigate + offer_refund (more confident resolution)
-- **Penalties** for bad practices (escalating unnecessarily, asking for info already given, repeating actions)
-- **Terminal reward** = final customer sentiment (continuous signal, 0.0–1.0)
-
-This makes the reward signal dense and informative for RL training.
+```
+ecommerce-env/
+├── env.py                      # Simulator: 5 ticket scenarios, reward logic, RNG
+├── models.py                   # Pydantic types: SupportAction, SupportObservation, SupportEnvState
+├── grader.py                   # Graders: grade_easy(), grade_medium(), grade_hard()
+├── ecommerce_environment.py    # Top-level environment wrapper
+├── baseline.py                 # Deterministic optimal-policy baseline
+├── inference.py                # LLM agent (OpenAI client)
+├── server/
+│   ├── app.py                  # FastAPI app: all endpoints + interactive HTML UI
+│   └── ecommerce_environment.py # OpenEnv-compliant Environment subclass
+├── Dockerfile
+├── openenv.yaml
+├── pyproject.toml
+└── requirements.txt
+```
