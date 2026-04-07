@@ -131,12 +131,22 @@ _UI_HTML = r"""<!DOCTYPE html>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-.hdr{background:linear-gradient(135deg,#1e3a5f,#0f2044);padding:18px 28px;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
-.hdr h1{font-size:1.3rem;color:#93c5fd}
-.hdr p{color:#94a3b8;font-size:0.82rem;margin-top:3px}
-.badge{background:#1e40af;color:#bfdbfe;padding:2px 9px;border-radius:999px;font-size:0.72rem;margin-left:8px}
-.hdr-links a{color:#60a5fa;font-size:0.8rem;text-decoration:none;margin-left:14px}
-.wrap{display:grid;grid-template-columns:1fr 380px;gap:16px;padding:18px 28px;max-width:1300px}
+.hdr{background:linear-gradient(135deg,#1e3a5f,#0f2044);padding:14px 20px;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.hdr h1{font-size:1.1rem;color:#93c5fd}
+.hdr p{color:#94a3b8;font-size:0.78rem;margin-top:3px}
+.badge{background:#1e40af;color:#bfdbfe;padding:2px 9px;border-radius:999px;font-size:0.7rem;margin-left:8px}
+.hdr-links a{color:#60a5fa;font-size:0.78rem;text-decoration:none;margin-left:10px}
+.wrap{display:grid;grid-template-columns:1fr 360px;gap:14px;padding:14px 20px;max-width:1300px}
+@media(max-width:800px){
+  .wrap{grid-template-columns:1fr;padding:10px 12px}
+  .hdr{padding:12px 14px}
+  .hdr h1{font-size:1rem}
+  .hdr-links{width:100%;display:flex;flex-wrap:wrap;gap:6px}
+  .hdr-links a{margin-left:0}
+  .actions-grid{grid-template-columns:1fr 1fr}
+  .conv{max-height:220px}
+  .card{padding:12px}
+}
 .card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px}
 .card h2{color:#93c5fd;font-size:0.9rem;margin-bottom:12px}
 /* Ticket header */

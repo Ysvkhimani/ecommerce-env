@@ -12,6 +12,13 @@ tags:
 
 # E-commerce Customer Support Agent — OpenEnv Environment
 
+[![Live Demo](https://img.shields.io/badge/🤗%20Live%20Demo-HuggingFace%20Space-blue)](https://y0120-ecommerce-env.hf.space)
+[![OpenEnv](https://img.shields.io/badge/OpenEnv-Hackathon%202026-orange)](https://huggingface.co/spaces/Y0120/ecommerce-env)
+[![Python](https://img.shields.io/badge/Python-3.11-green)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-teal)](https://fastapi.tiangolo.com)
+
+> 🚀 **[Try it live →](https://y0120-ecommerce-env.hf.space)**
+
 An **OpenEnv**-compliant RL environment where an AI agent plays the role of a **customer support representative** for an e-commerce store. Each episode the agent receives a **random real-world customer ticket**, must read it carefully to understand the issue, and then choose the right sequence of actions to resolve it efficiently.
 
 > **Why this matters:** AI-powered customer support is one of the fastest-growing applications of LLM agents. This environment tests whether an agent can *understand context*, *match resolution to problem type*, and *manage customer sentiment* — skills that directly transfer to production support systems.
